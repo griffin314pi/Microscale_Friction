@@ -1,0 +1,13 @@
+name: r_analysis
+title: r_analysis
+username:
+account: rauber1
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 7235076
+bundleId: 6377137
+url: https://rauber1.shinyapps.io/r_analysis/
+when: 1665086837.57429
+lastSyncTime: 1665086837.5743
+asMultiple: FALSE
+asStatic: FALSE
