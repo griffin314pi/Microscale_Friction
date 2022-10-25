@@ -35,7 +35,7 @@ ui <- fluidPage(
       # Input: Selector for choosing test.tbl ----
       
       selectInput(inputId = 'date',
-                  label = 'Choose a date:',
+                  label = 'Choose a file:',
                   choices = list.files(path = "/Users/griffinrauber/Microscale_Friction/Data/Fall2022_Data/",
                                        full.names = FALSE,
                                        recursive = FALSE))
