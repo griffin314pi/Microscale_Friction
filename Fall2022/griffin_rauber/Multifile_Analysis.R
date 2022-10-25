@@ -22,27 +22,19 @@ a = K/(8*G.star)
 
 # Define UI for test.tbl viewer app ----
 ui <- fluidPage(
-  
-  # App title ----
-  titlePanel("Data plot"),
-  
-  # Sidebar layout with input and output definitions ----
-  sidebarLayout(
-    
-    # Sidebar panel for inputs ----
-    sidebarPanel(
-      
-      # Input: Selector for choosing test.tbl ----
-      
-      selectInput(inputId = 'date',
-                  label = 'Choose a file:',
-                  choices = list.files(path = "/Users/griffinrauber/Microscale_Friction/Data/Fall2022_Data/",
-                                       full.names = FALSE,
-                                       recursive = FALSE))
-    ),
+  titlePanel(
+    h1("E5100 Data Analysis", align = "left")
+  ),
     
     # Main panel for displaying outputs ----
     mainPanel(
+      fluidRow(column(width=4,
+                      selectInput(inputId = 'file',
+                                  label = 'Choose a file:',
+                                  choices = list.files(path = "/Users/griffinrauber/Microscale_Friction/Data/Fall2022_Data/",
+                                                       full.names = FALSE,
+                                                       recursive = FALSE)))),
+
       #plotOutput("stiffness")
       fluidRow(
         column(width = 6,
@@ -124,14 +116,14 @@ ui <- fluidPage(
                downloadButton("reorderData", "Download reordered data")))
       
     )
-  )
+
 )
 
 # Define server  ----
 server <- function(input, output) {
   
   test.tbl <- reactive({
-    infile <- input$date
+    infile <- input$file
     if (is.null(infile)){
       return(NULL)
     }
