@@ -15,6 +15,7 @@ z.quartz <- 8800000
 area.effective <- 0.0025^2*pi
 amplitude.factor <- 1.4 #pm/V
 d26 <- 3.1*0.000000000001
+amplitude.factornoamplitude <- 0.012247
 
 U.star = 1
 F.elas.star = 1
@@ -98,7 +99,11 @@ ui <- fluidPage(
            verbatimTextOutput("COF")),
     column(width = 3,
            verbatimTextOutput("rsq"))),
-  
+  fluidRow(
+    column(width = 3, offset = 6,
+           verbatimTextOutput("PowerLow")),
+    column(width = 3, verbatimTextOutput("PowerHigh"))
+  ),
   #Slider range UI
   fluidRow(
     column(width = 6, offset = 6,
@@ -160,7 +165,7 @@ server <- function(input, output) {
   })
   
   #Extract segments when analysis button pressed
-
+  
   
   #Extract the testing conditions and units of measurement from input data
   testing.conditions <- reactive ({ test.tbl()[1,c(2:11)] })
@@ -200,41 +205,14 @@ server <- function(input, output) {
   
   analyzeClicked <- reactiveVal(FALSE)
   segextract <- reactive({#data.tbl <- data.frame(RMS.deltaV = segment_extraction(segcount = 1, dataset = tidy.tbl2))
-      req(analyzeClicked())
-      Baseline1 <- segment_extraction(segcount = input$Baseline1, dataset = tidy.tbl2, segID = segID)
-      Test_seg <- segment_extraction(segcount = input$Test_seg, dataset = tidy.tbl2, segID = segID)
-      Baseline2 <- segment_extraction(segcount = input$Baseline2, dataset = tidy.tbl2, segID = segID)
-
+    req(analyzeClicked())
+    Baseline1 <- segment_extraction(segcount = input$Baseline1, dataset = tidy.tbl2, segID = segID)
+    Test_seg <- segment_extraction(segcount = input$Test_seg, dataset = tidy.tbl2, segID = segID)
+    Baseline2 <- segment_extraction(segcount = input$Baseline2, dataset = tidy.tbl2, segID = segID)
     
-    #segcount1 <- 0
-    #while (TRUE) {
-      #segcount1 <- segcount1 + 1
-      #seg <- segment_extraction(segcount = segcount1, dataset = tidy.tbl2, segID = segID)
-      #if(seg$segType[1] == "B") {
-        #Baseline1 <- seg
-        #break
-      #}
-    #}
-    #while (TRUE) {
-      #segcount1 <- segcount1 + 1
-      #seg <- segment_extraction(segcount = segcount1, dataset = tidy.tbl2, segID = segID)
-      #if(seg$segType[1] == "B"){
-        #aseline1 <- seg
-      #}
-      #else if(seg$segType[1] == "T") {
-        #Test_seg <- seg
-        #break
-      #}
-    #}
-    #while (TRUE) {
-      #segcount1 <- segcount1 + 1
-      #seg <- segment_extraction(segcount = segcount1, dataset = tidy.tbl2, segID = segID)
-      #if(seg$segType[1] == "B") {
-        #Baseline2 <- seg
-        #break
-      #}
-    #}
-
+    
+    
+    
     list(Baseline1 = if (!is.null(Baseline1)) {Baseline1},
          Baseline2 = if (!is.null(Baseline2)) {Baseline2},
          Test_seg = if (!is.null(Test_seg)) {Test_seg})
@@ -245,7 +223,7 @@ server <- function(input, output) {
     
   })
   #Extract number of segments
-  segcount <- reactive({tidy.tbl2()$segID%>%rev()[1]%>%substr(num,2)%>%as.numeric()})
+  segcount <- reactive({as.numeric(gsub("\\D", "",rev(tidy.tbl2()$segID)[1]))})
   
   #Create final summary dataset with calculated metrics
   final.data <- reactive({ data.tbl <- data.frame(RMS.deltaV = segextract()$Test_seg$RMS.deltaV)
@@ -257,12 +235,18 @@ server <- function(input, output) {
            deltaGamma = segextract()$Test_seg$Gamma - (segextract()$Baseline2$Gamma + segextract()$Baseline1$Gamma)/2)
   data.tbl <- data.tbl%>%
     #quality factor
-    mutate(Q = 2*pi*segextract()$Test_seg$fs*(segextract()$Test_seg$L1/segextract()$Test_seg$R1))%>%
-    
-    #absolutes
-    
-    #amplitude
-    mutate(Amp = amplitude.factor*Q*sqrt(2)*RMS.deltaV/1000)%>%
+    mutate(Q = 2*pi*segextract()$Test_seg$fs*(segextract()$Test_seg$L1/segextract()$Test_seg$R1))
+  
+  #absolutes
+  
+  #amplitude
+  if (data.tbl$RMS.deltaV[1] == 0){
+    data.tbl <- data.tbl%>%mutate(Amp = amplitude.factornoamplitude*Q*sqrt(segextract()$Test_seg$Power))
+  }
+  else {
+    data.tbl <- data.tbl%>%mutate(Amp = amplitude.factor*Q*sqrt(2)*RMS.deltaV/1000)
+  }
+  data.tbl <- data.tbl%>%
     #Ki elastic
     mutate(Ki.elas = 2*(pi^2)*z.quartz*area.effective*deltaFs/1000)%>%
     #2pi fb
@@ -278,6 +262,8 @@ server <- function(input, output) {
              2*(pi^3)*z.quartz*area.effective*deltaGamma*(Amp*0.000000001)^2*1000000000000)%>%
     #deltaGamma/deltaFs
     mutate(delGamma.delFs = deltaGamma/deltaFs)%>%
+    # Include Power in data set
+    mutate(Power = segextract()$Test_seg$Power)%>%
     arrange(Amp)
   data.tbl
   })
@@ -520,6 +506,14 @@ server <- function(input, output) {
     as.character(sprintf("Kinetic COF = %s", 
                          cof()))
   })
+  PowerHigh <- reactive({ max(filtered.data()$Power)})
+  PowerLow <- reactive({ min(filtered.data()$Power)})
+  output$PowerLow <- reactive({
+    paste("Min Power:", PowerLow()*10^6, "uW")
+  })
+  output$PowerHigh <- reactive({
+    paste("Max Power:", PowerHigh()*10^6, "uW")
+  })
   
   #Extract r squared from the linear model
   rsquared <- reactive ({ round(summary(lin.model())$r.squared,3) })
@@ -545,15 +539,16 @@ server <- function(input, output) {
   output$range <- renderPrint({input$sliderRange})
   
   #Code for making reordered dataset
-  reordered.data <- reactive({data.tbl <- data.frame()
-  for (x in 1:segcount){
+  reordered.data <- reactive({data.tbl <- data.frame(segment_extraction(segcount = 1, dataset = tidy.tbl2, segID = segID))
+  for (x in 2:segcount()){
     seg <- segment_extraction(segcount = x, dataset = tidy.tbl2, segID = segID)
     data.tbl <- cbind(data.tbl,seg)
   }
+  data.tbl
   #cbind(seg1(),seg2(),seg3(),seg4())
   })
   
-  #Code for dowmloading reordered data
+  #Code for downloading reordered data
   output$reorderData <- downloadHandler(
     filename = function() {paste("Reordered ", input$upload$name, ".csv", sep = "")
     },
@@ -562,7 +557,7 @@ server <- function(input, output) {
     }
   )
   
-  #Code for dowmloading results table
+  #Code for downloading results table
   output$downloadData <- downloadHandler(
     filename = function() {paste(input$filename, ".csv", sep = "")
     },
